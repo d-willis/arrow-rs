@@ -1,7 +1,8 @@
 use arrow::array::{self, MapBuilder, PrimitiveBuilder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Int32Type, Schema};
 use arrow::record_batch::RecordBatch;
-use parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
 use std::fs;
 use std::path::Path;
@@ -61,7 +62,7 @@ fn read_map_array_column() {
     let ints_builder: PrimitiveBuilder<Int32Type> = PrimitiveBuilder::new(1);
     let mut map_builder = MapBuilder::new(None, string_builder, ints_builder);
 
-    // Add two null records and one record with three entries
+    // Add two null records and one record with five entries
     map_builder.append(false).expect("adding null map entry");
     map_builder.append(false).expect("adding null map entry");
     map_builder.keys().append_value("three");
@@ -93,10 +94,8 @@ fn read_map_array_column() {
     // Read file
     let file = fs::File::open(&Path::new("read_map_column_with_leading_nulls.parquet"))
         .expect("open file");
-    let mut arrow_reader =
-        ParquetFileArrowReader::try_new(file).expect("Trying to read parquet file");
-    let record_batch_reader = arrow_reader.get_record_reader(1024);
-    for maybe_record_batch in record_batch_reader.expect("Getting batch iterator") {
+    let record_batch_reader = ParquetRecordBatchReaderBuilder::try_new(file).expect("Trying to read parquet file").build().expect("Getting batch iterator");
+    for maybe_record_batch in record_batch_reader {
         let record_batch = maybe_record_batch.expect("Getting current batch");
         let col = record_batch.column(0);
         let map_entry = array::as_map_array(col).value(2);
